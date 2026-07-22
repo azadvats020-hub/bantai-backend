@@ -3,24 +3,22 @@ const express = require("express");
 const cors = require("cors");
 const assistantRoutes = require("./routes/assistant");
 const authRoutes = require("./routes/auth");
+const authMiddleware = require("./middleware/auth");
 const { ensureDb } = require("./db/init_db");
 
 const app = express();
 
-app.use(
-  cors({
-    origin: "*", // we will lock this later
-  })
-);
-
+app.use(cors({ origin: "*" }));
 app.use(express.json());
 
 // Initialize DB
 ensureDb();
 
-// Routes
+// Public routes
 app.use("/api/auth", authRoutes);
-app.use("/api/assistant", assistantRoutes);
+
+// Protected routes
+app.use("/api/assistant", authMiddleware, assistantRoutes);
 
 app.get("/", (req, res) => res.json({ status: "ok" }));
 

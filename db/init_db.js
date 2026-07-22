@@ -17,8 +17,60 @@ function ensureDb() {
       )
     `);
 
-    // (We will add preferences table in STEP 2)
+    // USER PREFERENCES TABLE
+    db.run(`
+      CREATE TABLE IF NOT EXISTS user_preferences (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER NOT NULL,
+        key TEXT NOT NULL,
+        value TEXT NOT NULL,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (user_id) REFERENCES users(id),
+        UNIQUE(user_id, key)
+      )
+    `);
   });
 }
 
-module.exports = { db, ensureDb };
+function savePreference(userId, key, value) {
+  return new Promise((resolve, reject) => {
+    db.run(
+      `INSERT INTO user_preferences (user_id, key, value)
+       VALUES (?, ?, ?)
+       ON CONFLICT(user_id, key) DO UPDATE SET value = ?, updated_at = CURRENT_TIMESTAMP`,
+      [userId, key, value, value],
+      (err) => {
+        if (err) reject(err);
+        else resolve();
+      }
+    );
+  });
+}
+
+function getPreference(userId, key) {
+  return new Promise((resolve, reject) => {
+    db.get(
+      `SELECT value FROM user_preferences WHERE user_id = ? AND key = ?`,
+      [userId, key],
+      (err, row) => {
+        if (err) reject(err);
+        else resolve(row ? row.value : null);
+      }
+    );
+  });
+}
+
+function getAllPreferences(userId) {
+  return new Promise((resolve, reject) => {
+    db.all(
+      `SELECT key, value FROM user_preferences WHERE user_id = ?`,
+      [userId],
+      (err, rows) => {
+        if (err) reject(err);
+        else resolve(rows || []);
+      }
+    );
+  });
+}
+
+module.exports = { db, ensureDb, savePreference, getPreference, getAllPreferences };
