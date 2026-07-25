@@ -12,6 +12,16 @@ const BROWSER_HEADERS = {
   "Accept-Language": "en-IN,en;q=0.9",
 };
 
+// Checks if a dish/item name actually matches what the user searched for.
+// Splits the query into meaningful words (ignoring tiny words like "a", "to")
+// and requires the item name to contain at least one of them.
+function nameMatches(query, name) {
+  if (!name) return false;
+  const queryWords = query.toLowerCase().split(" ").filter(w => w.length > 2);
+  const lowerName = name.toLowerCase();
+  return queryWords.some(word => lowerName.includes(word));
+}
+
 // ─── SWIGGY ───────────────────────────────────────────────
 async function getSwiggyPrice(query, lat = DEFAULT_LAT, lng = DEFAULT_LNG) {
   try {
@@ -25,10 +35,12 @@ async function getSwiggyPrice(query, lat = DEFAULT_LAT, lng = DEFAULT_LNG) {
     function findDishes(obj) {
       if (!obj || typeof obj !== "object") return;
       if (obj.info && obj.info.price && obj.info.name) {
-        const price = obj.info.finalPrice || obj.info.price;
-        if (!lowestPrice || price < lowestPrice) {
-          lowestPrice = price;
-          itemName = obj.info.name;
+        if (nameMatches(query, obj.info.name)) {
+          const price = obj.info.finalPrice || obj.info.price;
+          if (!lowestPrice || price < lowestPrice) {
+            lowestPrice = price;
+            itemName = obj.info.name;
+          }
         }
       }
       if (Array.isArray(obj)) obj.forEach(findDishes);
@@ -66,11 +78,13 @@ async function getBlinkitPrice(query, lat = DEFAULT_LAT, lng = DEFAULT_LNG) {
     function findPrices(obj) {
       if (!obj || typeof obj !== "object") return;
       if ((obj.price || obj.mrp) && obj.name) {
-        const price = parseInt(obj.price || obj.mrp);
-        if (!isNaN(price) && price > 10 && price < 5000) {
-          if (!lowestPrice || price < lowestPrice) {
-            lowestPrice = price;
-            itemName = obj.name;
+        if (nameMatches(query, obj.name)) {
+          const price = parseInt(obj.price || obj.mrp);
+          if (!isNaN(price) && price > 10 && price < 5000) {
+            if (!lowestPrice || price < lowestPrice) {
+              lowestPrice = price;
+              itemName = obj.name;
+            }
           }
         }
       }
@@ -109,11 +123,13 @@ async function getZeptoPrice(query, lat = DEFAULT_LAT, lng = DEFAULT_LNG) {
     function findPrices(obj) {
       if (!obj || typeof obj !== "object") return;
       if ((obj.price || obj.mrp || obj.discounted_price) && obj.name) {
-        const price = parseInt(obj.discounted_price || obj.price || obj.mrp);
-        if (!isNaN(price) && price > 10 && price < 5000) {
-          if (!lowestPrice || price < lowestPrice) {
-            lowestPrice = price;
-            itemName = obj.name;
+        if (nameMatches(query, obj.name)) {
+          const price = parseInt(obj.discounted_price || obj.price || obj.mrp);
+          if (!isNaN(price) && price > 10 && price < 5000) {
+            if (!lowestPrice || price < lowestPrice) {
+              lowestPrice = price;
+              itemName = obj.name;
+            }
           }
         }
       }
@@ -149,11 +165,13 @@ async function getInstamartPrice(query, lat = DEFAULT_LAT, lng = DEFAULT_LNG) {
     function findPrices(obj) {
       if (!obj || typeof obj !== "object") return;
       if ((obj.price || obj.selling_price) && obj.display_name) {
-        const price = parseInt(obj.price || obj.selling_price);
-        if (!isNaN(price) && price > 10 && price < 5000) {
-          if (!lowestPrice || price < lowestPrice) {
-            lowestPrice = price;
-            itemName = obj.display_name;
+        if (nameMatches(query, obj.display_name)) {
+          const price = parseInt(obj.price || obj.selling_price);
+          if (!isNaN(price) && price > 10 && price < 5000) {
+            if (!lowestPrice || price < lowestPrice) {
+              lowestPrice = price;
+              itemName = obj.display_name;
+            }
           }
         }
       }
@@ -185,12 +203,12 @@ router.post("/food", async (req, res) => {
       getInstamartPrice(query, lat, lng),
     ]);
 
-    // Filter out nulls
+    // Filter out nulls (platforms with no matching item found)
     const available = results.filter(r => r !== null);
 
     if (available.length === 0) {
       return res.json({
-        reply: `I couldn't fetch prices for ${query} right now. Want me to open Swiggy so you can check manually?`,
+        reply: `I couldn't find "${query}" on any platform right now. Want me to open Swiggy so you can check manually?`,
         results: [],
         recommendation: null
       });
@@ -214,7 +232,8 @@ router.post("/food", async (req, res) => {
     return res.json({
       reply,
       results: available,
-      recommendation: cheapest.platform.toLowerCase().replace(" ", "_")
+      recommendation: cheapest.platform.toLowerCase().replace(" ", "_"),
+      matchedItemName: cheapest.name
     });
 
   } catch (err) {
