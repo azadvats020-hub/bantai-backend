@@ -4,6 +4,7 @@ const cors = require("cors");
 const assistantRoutes = require("./routes/assistant");
 const authRoutes = require("./routes/auth");
 const compareRoutes = require("./routes/compare");
+const orderRoutes = require("./routes/order");
 const authMiddleware = require("./middleware/auth");
 const { ensureDb } = require("./db/init_db");
 
@@ -21,6 +22,7 @@ app.use("/api/auth", authRoutes);
 // Protected routes
 app.use("/api/assistant", authMiddleware, assistantRoutes);
 app.use("/api/compare", authMiddleware, compareRoutes);
+app.use("/api/order", authMiddleware, orderRoutes);
 
 app.get("/", (req, res) => res.json({ status: "ok" }));
 
